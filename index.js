@@ -18,19 +18,26 @@ const frontendOrigins = frontendOriginRaw.split(',').map(s => s.trim()).filter(B
 // ⭐ CORS SETTINGS
 // Provide array of allowed origins when multiple are present
 // During local development, allow any origin to avoid CORS issues
-const corsOptions = (process.env.NODE_ENV === 'production')
-  ? {
-      origin: frontendOrigins.length === 1 ? frontendOrigins[0] : frontendOrigins,
-      credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
-    }
-  : {
-      origin: true, // reflect origin for dev
-      credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
-    };
+// Build CORS options with an origin checker to reliably reflect allowed origins
+const corsOptions = {
+  origin: function (origin, callback) {
+    // allow non-browser requests (e.g., curl, server-side)
+    if (!origin) return callback(null, true);
+    // debug log to help diagnose CORS failures
+    console.log('CORS incoming Origin:', origin);
+    if (frontendOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+};
+
+app.use(function(req, res, next) {
+  // For dev convenience, reflect origin when NODE_ENV !== 'production'
+  if (process.env.NODE_ENV !== 'production') res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  next();
+});
 
 app.use(cors(corsOptions));
 
